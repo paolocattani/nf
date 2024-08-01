@@ -25,7 +25,7 @@ const SCORES = {
 export function compareScores(score1, score2) {
   let winner = compareScoresValues(score1, score2);
   const handlers = [compareCardsValue, compareHighestCards];
-  for (let i = 0; i < handlers.length && rankCards === null; i++) {
+  for (let i = 0; i < handlers.length && winner === null; i++) {
     winner = handlers[i](score1[1], score2[1]);
   }
   return winner;
@@ -42,7 +42,7 @@ function compareScoresValues(score1, score2) {
 
   return result;
 }
-function compareCardsValue(cards1, cards2) {
+function compareCardsValue(score1, score2) {
   let result = null;
 
   const value1 = calculateCardsValue(score1[1]);
@@ -61,10 +61,10 @@ function compareHighestCards(cards1, cards2) {
   let result = null;
   const highest1 = getCardObject(hasHighestCard(cards1));
   const highest2 = getCardObject(hasHighestCard(cards2));
-  if (highest1.points > highest2.point) {
+  if (highest1.points > highest2.points) {
     result = 1;
   }
-  if (highest2.points > highest2.point) {
+  if (highest2.points > highest1.points) {
     result = 2;
   }
 
@@ -101,7 +101,7 @@ export function calcuteScore(cards) {
     rankScore = 10 - i;
   }
 
-  return [rankScore, rankCards];
+  return [rankScore, rankCards, calculateCardsValue(rankCards)];
 }
 
 /**
@@ -225,15 +225,7 @@ export function hasThree(cards) {
       J: ["JD"]
     }
   */
-  const aggregatedValues = cards.reduce((acc, c) => {
-    const card = getCardObject(c);
-    if (acc[card.value]) {
-      acc[card.value] = [...acc[card.value], card.letteral];
-    } else {
-      acc[card.value] = [card.letteral];
-    }
-    return acc;
-  }, {});
+  const aggregatedValues = aggregateCardsbyValue(cards);
   const temp = Object.values(aggregatedValues).find((v) => v.length === 3);
   if (temp?.length) {
     result = temp;
@@ -259,7 +251,19 @@ export function hasTwoPairs(cards) {
     }
   */
 
-  const aggregatedValues = cards.reduce((acc, c) => {
+  const aggregatedValues = aggregateCardsbyValue(cards);
+  const temp = Object.values(aggregatedValues)
+    .filter((v) => v.length === 2)
+    .flatMap((v) => v);
+
+  if (temp?.length === 4) {
+    result = sortCardsByValue(temp).map((v) => v.letteral);
+  }
+  return result;
+}
+
+function aggregateCardsbyValue(cards) {
+  return cards.reduce((acc, c) => {
     const card = getCardObject(c);
     if (acc[card.value]) {
       acc[card.value] = [...acc[card.value], card.letteral];
@@ -268,46 +272,36 @@ export function hasTwoPairs(cards) {
     }
     return acc;
   }, {});
-  const temp = Object.values(aggregatedValues)
-    .filter((v) => v.length === 2)
-    .flatMap((v) => v);
-
-  if (temp?.length === 4) {
-    return sortCardsByValue(temp).map((c) => c.letteral);
-  }
-  return result;
 }
-
 /**
  * **One Pair**: Two cards of the same value.
  * @param cards an array of cards
  * @returns the cards that compose the rank
  */
 export function hasOnePair(cards) {
-  const sortedCards = sortCardsByValue(cards);
   let result = null;
-  for (let ii = 0; ii < sortedCards.length; ii++) {
-    if (isSameValue([sortedCards[ii], sortedCards[ii + 1]])) {
-      result = [sortedCards[ii].letteral, sortedCards[ii + 1].letteral];
-      break;
-    }
-  }
+  const aggregatedValues = aggregateCardsbyValue(cards);
+  const temp = Object.values(aggregatedValues)
+    .filter((v) => v.length === 2)
+    .flatMap((v) => v);
 
+  if (temp?.length >= 2) {
+    result = sortCardsByValue(temp)
+      .map((c) => c.letteral)
+      .slice(0, 2);
+  }
   return result;
 }
 
 /**
- * **High Card**: Highest value card.
+ * **High Card**: Highest val ue card.
  * @param cards an array of cards
  * @returns the cards that compose the rank
  */
 export function hasHighestCard(cards) {
-  const sortedCards = cards.map((c) => {
-    const { points } = getCardObject(c);
-    return { points, card: c };
-  });
+  const sortedCards = cards.map(getCardObject);
   sortedCards.sort((v1, v2) => v2.points - v1.points);
-  return sortedCards[0].card;
+  return [sortedCards[0].letteral];
 }
 
 /**
